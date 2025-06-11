@@ -1,11 +1,10 @@
 <?php
 // class_schedule.php - Class Schedule Management System
-session_start();
 
-// Include required files
+// Include required files (session will be started in session.php)
+require_once 'config/session.php';
 require_once 'config/database.php';
 require_once 'config/functions.php';
-require_once 'config/session.php';
 
 // Require login
 requireLogin();
@@ -253,8 +252,92 @@ if ($session_message) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Class Schedule - EduHive</title>
-    <link rel="stylesheet" href="styles.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            width: 250px;
+            background: #8B4513;
+            color: white;
+            padding: 0;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .sidebar-header img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .sidebar-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            color: white;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-item:hover a,
+        .nav-item.active a {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-icon {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
         .class-schedule-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -417,17 +500,22 @@ if ($session_message) {
             height: 100%;
             background-color: rgba(0,0,0,0.5);
             backdrop-filter: blur(5px);
+            overflow-y: auto;
+            padding: 20px 0;
         }
 
         .modal-content {
             background-color: #f8f9fa;
-            margin: 5% auto;
-            padding: 30px;
+            margin: 20px auto;
+            padding: 25px;
             border-radius: 15px;
             width: 90%;
             max-width: 500px;
+            max-height: 85vh;
+            overflow-y: auto;
             box-shadow: 0 10px 30px rgba(0,0,0,0.3);
             animation: slideIn 0.3s ease;
+            position: relative;
         }
 
         @keyframes slideIn {
@@ -439,12 +527,14 @@ if ($session_message) {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #dee2e6;
         }
 
         .modal-title {
             color: #333;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
             margin: 0;
         }
@@ -452,35 +542,45 @@ if ($session_message) {
         .close-btn {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 20px;
             cursor: pointer;
             color: #666;
+            padding: 5px;
+            line-height: 1;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: all 0.3s ease;
         }
 
         .close-btn:hover {
             color: #333;
+            background: #e9ecef;
         }
 
         /* Form Styles */
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .form-label {
             display: block;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: #333;
             font-weight: 600;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .form-input,
         .form-select {
             width: 100%;
-            padding: 15px 20px;
-            border: 3px solid #333;
-            border-radius: 50px;
-            font-size: 16px;
+            padding: 10px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: white;
             transition: all 0.3s ease;
@@ -491,30 +591,32 @@ if ($session_message) {
         .form-select:focus {
             outline: none;
             border-color: #4A90A4;
-            box-shadow: 0 0 0 3px rgba(74, 144, 164, 0.1);
+            box-shadow: 0 0 0 2px rgba(74, 144, 164, 0.1);
         }
 
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 12px;
         }
 
         .form-actions {
             display: flex;
-            gap: 15px;
+            gap: 10px;
             justify-content: flex-end;
-            margin-top: 30px;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #dee2e6;
         }
 
         .btn {
-            padding: 12px 25px;
+            padding: 10px 20px;
             border: none;
-            border-radius: 50px;
+            border-radius: 8px;
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            font-size: 14px;
+            font-size: 13px;
         }
 
         .btn-primary {
@@ -579,51 +681,6 @@ if ($session_message) {
             gap: 10px;
         }
 
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .class-schedule-container {
-                padding: 10px;
-            }
-
-            .schedule-header {
-                flex-direction: column;
-                align-items: stretch;
-            }
-
-            .schedule-title {
-                font-size: 20px;
-                text-align: center;
-            }
-
-            .timetable-container {
-                overflow-x: auto;
-            }
-
-            .modal-content {
-                margin: 10% auto;
-                padding: 20px;
-                width: 95%;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .form-actions {
-                flex-direction: column;
-            }
-
-            .schedule-item {
-                flex-direction: column;
-                align-items: stretch;
-                gap: 10px;
-            }
-
-            .schedule-actions {
-                justify-content: center;
-            }
-        }
-
         /* Alert Styles */
         .alert {
             padding: 15px 20px;
@@ -648,6 +705,94 @@ if ($session_message) {
             background: #d1ecf1;
             border: 1px solid #bee5eb;
             color: #0c5460;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+
+            .class-schedule-container {
+                padding: 10px;
+            }
+
+            .schedule-header {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .schedule-title {
+                font-size: 20px;
+                text-align: center;
+            }
+
+            .timetable-container {
+                overflow-x: auto;
+            }
+
+            .modal {
+                padding: 10px 0;
+            }
+
+            .modal-content {
+                margin: 10px auto;
+                padding: 20px;
+                width: 95%;
+                max-width: none;
+                max-height: 90vh;
+                border-radius: 10px;
+            }
+
+            .modal-title {
+                font-size: 16px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .form-actions {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .btn {
+                width: 100%;
+                padding: 12px;
+            }
+
+            .schedule-item {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .schedule-actions {
+                justify-content: center;
+            }
+        }
+
+        @media (max-height: 600px) {
+            .modal-content {
+                max-height: 95vh;
+                margin: 10px auto;
+            }
+            
+            .form-group {
+                margin-bottom: 12px;
+            }
+            
+            .form-actions {
+                margin-top: 15px;
+                padding-top: 10px;
+            }
         }
     </style>
 </head>
@@ -864,16 +1009,31 @@ if ($session_message) {
     <script>
         // Modal functions
         function openModal() {
-            document.getElementById('scheduleModal').style.display = 'block';
+            const modal = document.getElementById('scheduleModal');
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+            
+            // Reset form
             document.getElementById('modalTitle').textContent = 'Add New Class';
             document.getElementById('formAction').value = 'add_schedule';
             document.getElementById('submitBtn').textContent = 'Add Class';
             document.getElementById('scheduleForm').reset();
             document.getElementById('scheduleId').value = '';
+            
+            // Focus on first input after modal animation
+            setTimeout(() => {
+                const firstInput = modal.querySelector('input[type="text"]');
+                if (firstInput) firstInput.focus();
+            }, 300);
+            
+            // Ensure modal is scrolled to top
+            const modalContent = modal.querySelector('.modal-content');
+            if (modalContent) modalContent.scrollTop = 0;
         }
 
         function closeModal() {
             document.getElementById('scheduleModal').style.display = 'none';
+            document.body.style.overflow = 'auto';
         }
 
         function editSchedule(scheduleId) {
@@ -882,23 +1042,34 @@ if ($session_message) {
             const schedule = schedules.find(s => s.id == scheduleId);
             
             if (schedule) {
+                const modal = document.getElementById('scheduleModal');
+                modal.style.display = 'block';
+                document.body.style.overflow = 'hidden';
+                
                 document.getElementById('modalTitle').textContent = 'Edit Class';
                 document.getElementById('formAction').value = 'update_schedule';
                 document.getElementById('submitBtn').textContent = 'Update Class';
                 document.getElementById('scheduleId').value = schedule.id;
                 
                 // Fill form fields
-                document.getElementById('subject').value = schedule.subject;
+                document.getElementById('subject').value = schedule.subject || '';
                 document.getElementById('course_code').value = schedule.course_code || '';
                 document.getElementById('instructor').value = schedule.instructor || '';
-                document.getElementById('day_of_week').value = schedule.day_of_week;
-                document.getElementById('start_time').value = schedule.start_time;
-                document.getElementById('end_time').value = schedule.end_time;
+                document.getElementById('day_of_week').value = schedule.day_of_week || '';
+                document.getElementById('start_time').value = schedule.start_time || '';
+                document.getElementById('end_time').value = schedule.end_time || '';
                 document.getElementById('location').value = schedule.location || '';
                 document.getElementById('room').value = schedule.room || '';
                 document.getElementById('semester').value = schedule.semester || '';
                 
-                document.getElementById('scheduleModal').style.display = 'block';
+                // Ensure modal is scrolled to top
+                const modalContent = modal.querySelector('.modal-content');
+                if (modalContent) modalContent.scrollTop = 0;
+                
+                // Focus on first input
+                setTimeout(() => {
+                    document.getElementById('subject').focus();
+                }, 300);
             }
         }
 
@@ -924,6 +1095,16 @@ if ($session_message) {
             }
         }
 
+        // Handle keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            const modal = document.getElementById('scheduleModal');
+            if (modal.style.display === 'block') {
+                if (event.key === 'Escape') {
+                    closeModal();
+                }
+            }
+        });
+
         // Form validation
         document.getElementById('scheduleForm').addEventListener('submit', function(e) {
             const startTime = document.getElementById('start_time').value;
@@ -934,6 +1115,11 @@ if ($session_message) {
                 alert('Start time must be before end time');
                 return false;
             }
+            
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
         });
 
         // Auto-hide alerts after 5 seconds

@@ -4,7 +4,7 @@ require_once 'config/session.php';
 require_once 'config/functions.php';
 
 // Require login
-requireLogin();
+// requireLogin();
 
 $user = getCurrentUser();
 $database = new Database();

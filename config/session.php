@@ -1,15 +1,17 @@
 <?php
 // config/session.php - Session management functions
 
-// Start session if not already started
+// Set session configuration for security BEFORE starting session
 if (session_status() === PHP_SESSION_NONE) {
-    // session_start();
+    // Configure session settings before starting
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']) ? 1 : 0);
+    ini_set('session.use_strict_mode', 1);
+    ini_set('session.cookie_samesite', 'Strict');
+    
+    // Start the session
+    session_start();
 }
-
-// Set session configuration for security
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
-ini_set('session.use_strict_mode', 1);
 
 /**
  * Check if user is logged in
