@@ -32,6 +32,16 @@ $menu_items = [
         'label' => 'Record Time',
         'icon' => '⏱️'
     ],
+    'file_manager' => [           // NEW
+        'file' => 'file_manager.php',
+        'label' => 'Files',
+        'icon' => '📁'
+    ],
+    'notifications' => [          // NEW
+        'file' => 'notifications.php',
+        'label' => 'Notifications',
+        'icon' => '🔔'
+    ],
     'reward' => [
         'file' => 'reward.php',
         'label' => 'Reward',
@@ -81,7 +91,71 @@ function isActivePage($page_key, $current_page) {
 </nav>
 
 <style>
-/* Additional styles for menu icons */
+
+ /* Sidebar Styles */
+        .sidebar {
+            width: 250px;
+            background: linear-gradient(135deg, #B8956A, #A6845C);
+            color: white;
+            padding: 0;
+            position: fixed;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .sidebar-header img {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+        }
+
+        .sidebar-header h2 {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .nav-menu {
+            list-style: none;
+            padding: 20px 0;
+        }
+
+        .nav-item {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .nav-item a {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            color: white;
+            text-decoration: none;
+            transition: background-color 0.3s ease;
+        }
+
+        .nav-item:hover a,
+        .nav-item.active a {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .menu-icon {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+        
 .menu-icon {
     margin-right: 10px;
     font-size: 16px;

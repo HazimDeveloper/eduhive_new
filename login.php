@@ -527,15 +527,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             <?php endif; ?>
 
-            <!-- Demo Account Info -->
-            <div class="demo-info">
-                <h4>Demo Account Available</h4>
-                <p><strong>Email:</strong> demo@eduhive.com</p>
-                <p><strong>Password:</strong> demo123</p>
-                <button type="button" class="demo-fill-btn" onclick="fillDemoCredentials()">
-                    Use Demo Account
-                </button>
-            </div>
             
             <!-- Login Form -->
             <form class="login-form" method="POST" id="loginForm">

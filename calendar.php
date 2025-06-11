@@ -115,7 +115,7 @@ $message = getMessage();
         /* Sidebar Styles */
         .sidebar {
             width: 250px;
-            background: #8B4513;
+            background: linear-gradient(135deg, #B8956A, #A6845C);
             color: white;
             padding: 0;
             position: fixed;

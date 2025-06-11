@@ -10,10 +10,119 @@ $user = getCurrentUser();
 $database = new Database();
 $db = $database->getConnection();
 
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    switch ($_POST['action']) {
+        case 'test_notifications':
+            $title = cleanInput($_POST['title'] ?? '');
+            $description = cleanInput($_POST['description'] ?? '');
+            $priority = cleanInput($_POST['priority'] ?? 'medium');
+            $due_date = cleanInput($_POST['due_date'] ?? '');
+            $assign_to = (int)($_POST['assign_to'] ?? 0);
+            
+            // Notification preferences
+            $notify_email = isset($_POST['notify_email']);
+            $notify_telegram = isset($_POST['notify_telegram']);
+            
+            if (empty($title)) {
+                setMessage('Task title is required.', 'error');
+            } else {
+                try {
+                    // Create task
+                    $assigned_user_id = $assign_to ?: $user['id'];
+                    
+                    $stmt = $db->prepare("
+                        INSERT INTO tasks (user_id, title, description, priority, due_date, status, created_at) 
+                        VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                    ");
+                    $stmt->execute([$assigned_user_id, $title, $description, $priority, $due_date ?: null]);
+                    $task_id = $db->lastInsertId();
+                    
+                    // Send assignment notification if assigning to someone else
+                    if ($assign_to && $assign_to != $user['id']) {
+                        $channels = ['website'];
+                        if ($notify_email) $channels[] = 'email';
+                        if ($notify_telegram) $channels[] = 'telegram';
+                        
+                        $assignment_title = "📋 New Task Assigned";
+                        $assignment_message = "You have been assigned: '$title'";
+                        $assignment_message .= "\nAssigned by: {$user['name']}";
+                        if ($due_date) {
+                            $assignment_message .= "\nDue: " . date('M d, Y', strtotime($due_date));
+                        }
+                        
+                        sendMultiNotification($assign_to, $assignment_title, $assignment_message, 'task_assignment', $channels);
+                    }
+                    
+                    setMessage('Task created and notifications sent!', 'success');
+                } catch (Exception $e) {
+                    setMessage('Error creating task.', 'error');
+                }
+            }
+            break;
+            
+        case 'run_reminder_check':
+            $reminder_count = checkTasksAndSendReminders();
+            setMessage("Checked tasks. Sent $reminder_count reminders.", 'info');
+            break;
+    }
+    
+    header("Location: task.php");
+    exit();
+}
+
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
         switch ($_POST['action']) {
+            case 'test_notifications':
+            $title = cleanInput($_POST['title'] ?? '');
+            $description = cleanInput($_POST['description'] ?? '');
+            $priority = cleanInput($_POST['priority'] ?? 'medium');
+            $due_date = cleanInput($_POST['due_date'] ?? '');
+            $assign_to = (int)($_POST['assign_to'] ?? 0);
+            
+            // Notification preferences
+            $notify_email = isset($_POST['notify_email']);
+            $notify_telegram = isset($_POST['notify_telegram']);
+            
+            if (empty($title)) {
+                setMessage('Task title is required.', 'error');
+            } else {
+                try {
+                    // Create task
+                    $assigned_user_id = $assign_to ?: $user['id'];
+                    
+                    $stmt = $db->prepare("
+                        INSERT INTO tasks (user_id, title, description, priority, due_date, status, created_at) 
+                        VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                    ");
+                    $stmt->execute([$assigned_user_id, $title, $description, $priority, $due_date ?: null]);
+                    $task_id = $db->lastInsertId();
+                    
+                    // Send assignment notification if assigning to someone else
+                    if ($assign_to && $assign_to != $user['id']) {
+                        $channels = ['website'];
+                        if ($notify_email) $channels[] = 'email';
+                        if ($notify_telegram) $channels[] = 'telegram';
+                        
+                        $assignment_title = "📋 New Task Assigned";
+                        $assignment_message = "You have been assigned: '$title'";
+                        $assignment_message .= "\nAssigned by: {$user['name']}";
+                        if ($due_date) {
+                            $assignment_message .= "\nDue: " . date('M d, Y', strtotime($due_date));
+                        }
+                        
+                        sendMultiNotification($assign_to, $assignment_title, $assignment_message, 'task_assignment', $channels);
+                    }
+                    
+                    setMessage('Task created and notifications sent!', 'success');
+                } catch (Exception $e) {
+                    setMessage('Error creating task.', 'error');
+                }
+            }
+            break;
+            
             case 'add_task':
                 $title = cleanInput($_POST['title'] ?? '');
                 $description = cleanInput($_POST['description'] ?? '');
@@ -38,27 +147,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 break;
                 
             case 'update_status':
-                $task_id = (int)($_POST['task_id'] ?? 0);
-                $status = cleanInput($_POST['status'] ?? '');
-                
-                try {
-                    $stmt = $db->prepare("UPDATE tasks SET status = ?, updated_at = NOW() WHERE id = ? AND user_id = ?");
-                    $stmt->execute([$status, $task_id, $user['id']]);
-                    
-                    // Award points for completed tasks
-                    if ($status === 'completed') {
-                        $stmt = $db->prepare("
-                            INSERT INTO rewards (user_id, badge_name, badge_type, points, description, earned_date) 
-                            VALUES (?, 'Task Completed', 'achievement', 10, 'Completed a task', CURRENT_DATE)
-                        ");
-                        $stmt->execute([$user['id']]);
-                    }
-                    
-                    setMessage('Task status updated!', 'success');
-                } catch (Exception $e) {
-                    setMessage('Error updating task status.', 'error');
-                }
-                break;
+    $task_id = (int)($_POST['task_id'] ?? 0);
+    $status = cleanInput($_POST['status'] ?? '');
+    
+    try {
+        // Get task details first
+        $stmt = $db->prepare("SELECT title FROM tasks WHERE id = ? AND user_id = ?");
+        $stmt->execute([$task_id, $user['id']]);
+        $task = $stmt->fetch();
+        
+        $stmt = $db->prepare("UPDATE tasks SET status = ?, updated_at = NOW() WHERE id = ? AND user_id = ?");
+        $stmt->execute([$status, $task_id, $user['id']]);
+        
+        // Award points and create notification for completed tasks
+        if ($status === 'completed' && $task) {
+            $stmt = $db->prepare("
+                INSERT INTO rewards (user_id, badge_name, badge_type, points, description, earned_date) 
+                VALUES (?, 'Task Completed', 'achievement', 10, 'Completed a task', CURRENT_DATE)
+            ");
+            $stmt->execute([$user['id']]);
+            
+            // Create completion notification
+            createNotification(
+                $user['id'], 
+                'Task Completed! 🎉', 
+                "Great job completing '{$task['title']}'! You earned 10 points.", 
+                'achievement'
+            );
+        }
+        
+        setMessage('Task status updated!', 'success');
+    } catch (Exception $e) {
+        setMessage('Error updating task status.', 'error');
+    }
+    break;
                 
             case 'delete_task':
                 $task_id = (int)($_POST['task_id'] ?? 0);
@@ -167,6 +289,44 @@ $message = getMessage();
             border-bottom: 1px solid rgba(255, 255, 255, 0.1);
             display: flex;
             align-items: center;
+            gap: 15px;
+        }
+
+         .notification-settings {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .notification-channel {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        
+        .notification-channel input[type="checkbox"] {
+            margin-right: 8px;
+            transform: scale(1.2);
+        }
+        
+        .telegram-setup {
+            background: #e3f2fd;
+            border: 1px solid #90caf9;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+        }
+        
+        .telegram-steps {
+            font-size: 12px;
+            color: #1976d2;
+            margin-top: 10px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
         }
 
@@ -727,6 +887,123 @@ $message = getMessage();
             </button>
         </div>
 
+         <!-- Enhanced Add Task Modal -->
+        <div id="addTaskModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Create Task with Notifications</h2>
+                    <button class="close-btn" onclick="closeModal('addTaskModal')">&times;</button>
+                </div>
+
+                <form method="POST">
+                    <input type="hidden" name="action" value="add_task_with_notifications">
+
+                    <div class="form-group">
+                        <label class="form-label">Task Title *</label>
+                        <input type="text" name="title" class="form-input" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Description</label>
+                        <textarea name="description" class="form-textarea"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Priority</label>
+                            <select name="priority" class="form-select">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Due Date</label>
+                            <input type="date" name="due_date" class="form-input" min="<?php echo date('Y-m-d'); ?>">
+                        </div>
+                    </div>
+
+                    <!-- Assignment Section -->
+                    <div class="form-group">
+                        <label class="form-label">Assign to User (Optional)</label>
+                        <select name="assign_to" class="form-select">
+                            <option value="">Assign to myself</option>
+                            <?php
+                            // Get all users for assignment
+                            try {
+                                $stmt = $db->prepare("SELECT id, name, email FROM users WHERE id != ? ORDER BY name");
+                                $stmt->execute([$user['id']]);
+                                $all_users = $stmt->fetchAll();
+                                foreach ($all_users as $u) {
+                                    echo "<option value='{$u['id']}'>{$u['name']} ({$u['email']})</option>";
+                                }
+                            } catch (Exception $e) {
+                                // Handle error
+                            }
+                            ?>
+                        </select>
+                    </div>
+
+                    <!-- Notification Settings -->
+                    <div class="notification-settings">
+                        <h4 style="margin-bottom: 10px;">📢 Notification Settings</h4>
+                        <p style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                            Choose how to notify about this task
+                        </p>
+                        
+                        <div class="notification-channel">
+                            <input type="checkbox" name="notify_website" id="notify_website" checked disabled>
+                            <label for="notify_website">🌐 Website Notification (Always enabled)</label>
+                        </div>
+                        
+                        <div class="notification-channel">
+                            <input type="checkbox" name="notify_email" id="notify_email" checked>
+                            <label for="notify_email">📧 Email Notification</label>
+                        </div>
+                        
+                        <div class="notification-channel">
+                            <input type="checkbox" name="notify_telegram" id="notify_telegram">
+                            <label for="notify_telegram">📱 Telegram Notification</label>
+                        </div>
+
+                        <div class="telegram-setup" id="telegramSetup" style="display: none;">
+                            <strong>📱 Setup Telegram Notifications:</strong>
+                            <div class="telegram-steps">
+                                1. Search for bot: <code>@YourEduHiveBot</code><br>
+                                2. Send: <code>/start</code><br>
+                                3. Copy your Chat ID from bot response<br>
+                                4. Enter it in your profile settings
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn secondary" onclick="closeModal('addTaskModal')">Cancel</button>
+                        <button type="submit" class="btn primary">Create Task & Send Notifications</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Notification Test Section -->
+        <div class="card" style="margin: 20px 0;">
+            <div class="card-header">
+                <h3>🧪 Test Notifications</h3>
+            </div>
+            <div class="card-body">
+                <p>Test your notification settings:</p>
+                <div style="margin: 15px 0; display: flex; gap: 10px;">
+                    <button onclick="testNotification('email')" class="btn primary">📧 Test Email</button>
+                    <button onclick="testNotification('telegram')" class="btn primary">📱 Test Telegram</button>
+                    <button onclick="testNotification('all')" class="btn primary">🔔 Test All</button>
+                </div>
+                
+                <form method="POST" style="margin-top: 15px;">
+                    <input type="hidden" name="action" value="run_reminder_check">
+                    <button type="submit" class="btn secondary">⏰ Check Due Tasks Now</button>
+                </form>
+            </div>
+        </div>
         <!-- Show Message if exists -->
         <?php if ($message): ?>
             <div class="message <?php echo htmlspecialchars($message['type']); ?>">
@@ -959,6 +1236,43 @@ $message = getMessage();
         document.getElementById('priority').addEventListener('change', function() {
             this.form.submit();
         });
+
+          document.getElementById('notify_telegram').addEventListener('change', function() {
+            document.getElementById('telegramSetup').style.display = this.checked ? 'block' : 'none';
+        });
+
+        // Test notifications
+        function testNotification(type) {
+            fetch('test_notifications.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: 'action=test_notification&type=' + type
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✅ Test notification sent! Check your ' + type + '.');
+                } else {
+                    alert('❌ Failed to send notification: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error: ' + error);
+            });
+        }
+
+        // Auto-check for due tasks every 30 minutes
+        setInterval(function() {
+            fetch('check_notifications.php?auto_check=1')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.new_reminders > 0) {
+                        console.log('Sent ' + data.new_reminders + ' new task reminders');
+                    }
+                });
+        }, 30 * 60 * 1000); // 30 minutes
     </script>
 </body>
 </html>

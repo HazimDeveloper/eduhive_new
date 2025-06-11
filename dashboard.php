@@ -12,7 +12,7 @@ $db = $database->getConnection();
 
 // Get user statistics
 $stats = calculateStudyStats($user['id'], $database);
-
+$unread_notifications = getUnreadNotificationCount($user['id'], $database);
 // Get recent tasks (next 5 upcoming tasks)
 try {
     $stmt = $db->prepare("
@@ -526,6 +526,26 @@ $message = getMessage();
                 padding: 20px;
             }
         }
+
+        .notification-badge {
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 5px;
+}
+
+.nav-item a {
+    position: relative;
+}
+
+.nav-item a .notification-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
     </style>
 </head>
 <body>
@@ -552,7 +572,18 @@ $message = getMessage();
             <a href="task.php" class="quick-btn">➕ Add Task</a>
             <a href="calendar.php" class="quick-btn">📅 View Calendar</a>
             <a href="record_time.php" class="quick-btn">⏱️ Track Time</a>
+                    
+<div class="notification-indicator quick-btn">
+    <a href="notifications.php" style="text-decoration: none;color: white;">
+        🔔 Notifications
+        <?php if ($unread_notifications > 0): ?>
+            <span class="badge"><?php echo $unread_notifications; ?></span>
+        <?php endif; ?>
+    </a>
+</div>
         </div>
+
+        
 
         <!-- Statistics Cards -->
         <div class="stats-grid">

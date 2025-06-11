@@ -269,7 +269,6 @@ if ($session_message) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile - EduHive</title>
-    <link rel="stylesheet" href="styles.css">
     <style>
         .profile-container {
             max-width: 1200px;
@@ -734,6 +733,20 @@ if ($session_message) {
                                 </form>
                             </div>
                         </div>
+
+                        <div class="form-group">
+    <label class="form-label">Telegram Chat ID (Optional)</label>
+    <input type="text" name="telegram_chat_id" class="form-input" 
+           value="<?php echo htmlspecialchars($user_profile['telegram_chat_id'] ?? ''); ?>"
+           placeholder="Your Telegram Chat ID">
+    <small class="form-help">Get this from @YourEduHiveBot after sending /start</small>
+</div>
+
+<div class="checkbox-group">
+    <input type="checkbox" name="notification_telegram" id="notification_telegram" 
+           <?php echo $user_settings['notification_telegram'] ? 'checked' : ''; ?>>
+    <label for="notification_telegram">Enable Telegram Notifications</label>
+</div>
 
                         <!-- Security Tab -->
                         <div id="security" class="tab-content">
