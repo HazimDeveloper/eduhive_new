@@ -31,15 +31,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     VALUES (?, 'Daily Login', 'daily', 5, 'Logged in today', ?)
                 ");
                 $stmt->execute([$user['id'], $today]);
-                setMessage('Daily reward claimed! +5 points', 'success');
+                
+                // Create success notification
+                createNotification(
+                    $user['id'],
+                    '🎉 Daily Reward Claimed!',
+                    'You have successfully claimed your daily 5 points bonus!',
+                    'achievement'
+                );
+                
+                setMessage('🎉 Daily reward claimed successfully! You earned 5 points!', 'success');
             } else {
-                setMessage('You have already claimed your daily reward today!', 'info');
+                setMessage('You have already claimed your daily reward today! Come back tomorrow.', 'info');
             }
         } catch (Exception $e) {
+            error_log("Daily reward claim error: " . $e->getMessage());
             setMessage('Error claiming reward. Please try again.', 'error');
         }
     }
     
+    // Redirect to prevent form resubmission
     header("Location: reward.php");
     exit();
 }
@@ -201,70 +212,6 @@ $message = getMessage();
             background-color: #f8f9fa;
             display: flex;
             min-height: 100vh;
-        }
-
-        /* Sidebar Styles */
-        .sidebar {
-            width: 250px;
-            background: #8B4513;
-            color: white;
-            padding: 0;
-            position: fixed;
-            height: 100vh;
-            left: 0;
-            top: 0;
-            overflow-y: auto;
-            transition: transform 0.3s ease;
-            z-index: 1000;
-        }
-
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .sidebar-header img {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-        }
-
-        .sidebar-header h2 {
-            font-size: 24px;
-            font-weight: 600;
-        }
-
-        .nav-menu {
-            list-style: none;
-            padding: 20px 0;
-        }
-
-        .nav-item {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .nav-item a {
-            display: flex;
-            align-items: center;
-            padding: 15px 20px;
-            color: white;
-            text-decoration: none;
-            transition: background-color 0.3s ease;
-        }
-
-        .nav-item:hover a,
-        .nav-item.active a {
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .menu-icon {
-            margin-right: 10px;
-            font-size: 16px;
-            width: 20px;
-            display: inline-block;
         }
 
         /* Main Content */
@@ -474,6 +421,7 @@ $message = getMessage();
             transition: all 0.3s ease;
             text-transform: uppercase;
             letter-spacing: 1px;
+            min-width: 200px;
         }
 
         .claim-btn:hover:not(:disabled) {
@@ -486,6 +434,52 @@ $message = getMessage();
             background: #6c757d;
             cursor: not-allowed;
             transform: none;
+        }
+
+        .claim-btn.claiming {
+            background: #ffc107;
+            animation: pulse 1.5s infinite;
+        }
+
+        .claim-btn.claimed {
+            background: #28a745;
+        }
+
+        /* Success Animation */
+        .success-popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            z-index: 10000;
+            display: none;
+        }
+
+        .success-popup.show {
+            display: block;
+            animation: successPopup 0.5s ease;
+        }
+
+        .success-popup .popup-icon {
+            font-size: 60px;
+            margin-bottom: 15px;
+        }
+
+        .success-popup .popup-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .success-popup .popup-message {
+            color: #666;
+            margin-bottom: 20px;
         }
 
         /* Achievement Badges */
@@ -601,54 +595,6 @@ $message = getMessage();
             font-size: 14px;
         }
 
-        /* Leaderboard */
-        .leaderboard-list {
-            list-style: none;
-        }
-
-        .leaderboard-item {
-            display: flex;
-            align-items: center;
-            padding: 15px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .leaderboard-item:last-child {
-            border-bottom: none;
-        }
-
-        .rank {
-            font-size: 18px;
-            font-weight: 700;
-            color: #C4A484;
-            width: 30px;
-        }
-
-        .rank.top3 {
-            color: #ffc107;
-        }
-
-        .user-info {
-            flex: 1;
-            margin-left: 15px;
-        }
-
-        .user-name {
-            font-weight: 500;
-            color: #333;
-        }
-
-        .user-badges {
-            font-size: 12px;
-            color: #666;
-        }
-
-        .user-points {
-            font-weight: 600;
-            color: #C4A484;
-            font-size: 16px;
-        }
-
         /* Empty State */
         .empty-state {
             text-align: center;
@@ -674,10 +620,6 @@ $message = getMessage();
         }
 
         @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-100%);
-            }
-
             .main-content {
                 margin-left: 0;
                 padding: 20px;
@@ -725,8 +667,25 @@ $message = getMessage();
             }
         }
 
-        .daily-available {
-            animation: pulse 2s infinite;
+        @keyframes successPopup {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background: #C4A484;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
         }
     </style>
 </head>
@@ -781,22 +740,27 @@ $message = getMessage();
             <!-- Left Column -->
             <div>
                 <!-- Daily Reward -->
-                <div class="card <?php echo $daily_reward_available ? 'daily-available' : ''; ?>" style="margin-bottom: 30px;">
+                <div class="card" style="margin-bottom: 30px;">
                     <div class="card-header">
                         <h3 class="card-title">Daily Reward</h3>
                     </div>
                     <div class="daily-reward">
-                        <span class="reward-icon"><?php echo $daily_reward_available ? '🎁' : '✅'; ?></span>
-                        <h3 class="reward-title">
+                        <span class="reward-icon" id="rewardIcon"><?php echo $daily_reward_available ? '🎁' : '✅'; ?></span>
+                        <h3 class="reward-title" id="rewardTitle">
                             <?php echo $daily_reward_available ? 'Daily Login Bonus' : 'Already Claimed'; ?>
                         </h3>
-                        <p class="reward-description">
+                        <p class="reward-description" id="rewardDescription">
                             <?php echo $daily_reward_available ? 'Claim your daily 5 points for logging in!' : 'Come back tomorrow for your next reward!'; ?>
                         </p>
-                        <form method="POST" style="display: inline;">
+                        
+                        <form method="POST" id="claimForm">
                             <input type="hidden" name="action" value="claim_daily_reward">
-                            <button type="submit" class="claim-btn" <?php echo !$daily_reward_available ? 'disabled' : ''; ?>>
-                                <?php echo $daily_reward_available ? 'Claim +5 Points' : 'Claimed Today'; ?>
+                            <button type="button" 
+                                    class="claim-btn" 
+                                    id="claimBtn"
+                                    onclick="claimDailyReward()"
+                                    <?php echo !$daily_reward_available ? 'disabled' : ''; ?>>
+                                <?php echo $daily_reward_available ? 'CLAIM +5 POINTS' : 'CLAIMED TODAY'; ?>
                             </button>
                         </form>
                     </div>
@@ -870,225 +834,98 @@ $message = getMessage();
                         <?php endif; ?>
                     </div>
                 </div>
-
-                <!-- Leaderboard -->
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">Leaderboard</h3>
-                    </div>
-                    <div class="card-body">
-                        <?php if (!empty($leaderboard)): ?>
-                            <ul class="leaderboard-list">
-                                <?php foreach ($leaderboard as $index => $leader): ?>
-                                    <li class="leaderboard-item">
-                                        <div class="rank <?php echo $index < 3 ? 'top3' : ''; ?>">
-                                            #<?php echo $index + 1; ?>
-                                        </div>
-                                        <div class="user-info">
-                                            <div class="user-name">
-                                                <?php echo htmlspecialchars($leader['name']); ?>
-                                                <?php if ($leader['name'] === $user['name']): ?>
-                                                    <span style="color: #C4A484;">(You)</span>
-                                                <?php endif; ?>
-                                            </div>
-                                            <div class="user-badges"><?php echo $leader['badge_count']; ?> badges earned</div>
-                                        </div>
-                                        <div class="user-points"><?php echo number_format($leader['total_points']); ?> pts</div>
-                                    </li>
-                                <?php endforeach; ?>
-                            </ul>
-                        <?php else: ?>
-                            <div class="empty-state">
-                                <div class="empty-state-icon">🏆</div>
-                                <p>Leaderboard is empty. Be the first to earn points!</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Achievement Goals Section -->
-        <div class="card" style="margin-top: 30px;">
-            <div class="card-header">
-                <h3 class="card-title">🎯 Achievement Goals</h3>
-            </div>
-            <div class="card-body">
-                <div class="badges-grid">
-                    <!-- Achievement progress cards -->
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $total_tasks >= 1 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $total_tasks >= 1 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">First Steps</div>
-                        <div class="badge-description">Create your first task</div>
-                        <div class="badge-points">+10 points</div>
-                        <div class="badge-date">
-                            <?php if ($total_tasks >= 1): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo $total_tasks; ?>/1</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $completed_tasks >= 10 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $completed_tasks >= 10 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Task Master</div>
-                        <div class="badge-description">Complete 10 tasks</div>
-                        <div class="badge-points">+25 points</div>
-                        <div class="badge-date">
-                            <?php if ($completed_tasks >= 10): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo $completed_tasks; ?>/10</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $completed_tasks >= 50 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $completed_tasks >= 50 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Productivity Pro</div>
-                        <div class="badge-description">Complete 50 tasks</div>
-                        <div class="badge-points">+50 points</div>
-                        <div class="badge-date">
-                            <?php if ($completed_tasks >= 50): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo $completed_tasks; ?>/50</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $total_time >= 600 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $total_time >= 600 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Study Warrior</div>
-                        <div class="badge-description">Log 10 hours of study time</div>
-                        <div class="badge-points">+30 points</div>
-                        <div class="badge-date">
-                            <?php if ($total_time >= 600): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo formatDuration($total_time); ?>/10 hours</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $total_time >= 3000 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $total_time >= 3000 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Dedicated Student</div>
-                        <div class="badge-description">Log 50 hours of study time</div>
-                        <div class="badge-points">+75 points</div>
-                        <div class="badge-date">
-                            <?php if ($total_time >= 3000): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo formatDuration($total_time); ?>/50 hours</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $login_days >= 7 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $login_days >= 7 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Consistent Learner</div>
-                        <div class="badge-description">Log in for 7 days</div>
-                        <div class="badge-points">+40 points</div>
-                        <div class="badge-date">
-                            <?php if ($login_days >= 7): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo $login_days; ?>/7 days</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: <?php echo $login_days >= 30 ? '0.5' : '1'; ?>;">
-                        <span class="badge-icon"><?php echo $login_days >= 30 ? '✅' : '🎯'; ?></span>
-                        <div class="badge-name">Habit Builder</div>
-                        <div class="badge-description">Log in for 30 days</div>
-                        <div class="badge-points">+100 points</div>
-                        <div class="badge-date">
-                            <?php if ($login_days >= 30): ?>
-                                <span style="color: #28a745;">✓ Completed</span>
-                            <?php else: ?>
-                                <span style="color: #ffc107;">Progress: <?php echo $login_days; ?>/30 days</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-
-                    <!-- Coming Soon Achievement -->
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: 0.6;">
-                        <span class="badge-icon">🔮</span>
-                        <div class="badge-name">Team Player</div>
-                        <div class="badge-description">Join your first team</div>
-                        <div class="badge-points">+20 points</div>
-                        <div class="badge-date" style="color: #6c757d;">Coming Soon</div>
-                    </div>
-
-                    <div class="badge-card" style="border: 2px dashed #ddd; opacity: 0.6;">
-                        <span class="badge-icon">🔮</span>
-                        <div class="badge-name">Calendar Master</div>
-                        <div class="badge-description">Schedule 20 classes</div>
-                        <div class="badge-points">+35 points</div>
-                        <div class="badge-date" style="color: #6c757d;">Coming Soon</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Tips Section -->
-        <div class="card" style="margin-top: 30px;">
-            <div class="card-header">
-                <h3 class="card-title">💡 Tips to Earn More Points</h3>
-            </div>
-            <div class="card-body">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #C4A484;">
-                        <h4 style="color: #333; margin-bottom: 10px;">📋 Complete Tasks</h4>
-                        <p style="color: #666; margin: 0;">Each completed task earns you 10 points. Set realistic goals and complete them consistently!</p>
-                    </div>
-                    
-                    <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #C4A484;">
-                        <h4 style="color: #333; margin-bottom: 10px;">📅 Daily Login</h4>
-                        <p style="color: #666; margin: 0;">Log in every day to claim your daily 5-point bonus. Consistency is key!</p>
-                    </div>
-                    
-                    <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #C4A484;">
-                        <h4 style="color: #333; margin-bottom: 10px;">⏱️ Track Study Time</h4>
-                        <p style="color: #666; margin: 0;">Use the time tracking feature to monitor your study sessions and unlock study-related achievements.</p>
-                    </div>
-                    
-                    <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 4px solid #C4A484;">
-                        <h4 style="color: #333; margin-bottom: 10px;">🎯 Set Goals</h4>
-                        <p style="color: #666; margin: 0;">Create meaningful tasks and work towards bigger achievements for maximum point rewards.</p>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
 
+    <!-- Success Popup -->
+    <div id="successPopup" class="success-popup">
+        <div class="popup-icon">🎉</div>
+        <div class="popup-title">Congratulations!</div>
+        <div class="popup-message">You have successfully claimed your daily reward!</div>
+    </div>
+
     <script>
+        function claimDailyReward() {
+            const btn = document.getElementById('claimBtn');
+            const form = document.getElementById('claimForm');
+            const icon = document.getElementById('rewardIcon');
+            const title = document.getElementById('rewardTitle');
+            const description = document.getElementById('rewardDescription');
+            
+            // Prevent double submission
+            if (btn.disabled) return;
+            
+            // Change button state
+            btn.disabled = true;
+            btn.classList.add('claiming');
+            btn.innerHTML = '🎁 CLAIMING...';
+            
+            // Create confetti effect
+            createConfetti();
+            
+            // Submit form after a short delay for visual effect
+            setTimeout(() => {
+                // Change to success state before submission
+                btn.classList.remove('claiming');
+                btn.classList.add('claimed');
+                btn.innerHTML = '✅ CLAIMED!';
+                icon.textContent = '🎉';
+                title.textContent = 'Reward Claimed!';
+                description.textContent = 'You earned 5 points! Come back tomorrow for more.';
+                
+                // Show success popup
+                showSuccessPopup();
+                
+                // Submit form after showing success
+                setTimeout(() => {
+                    form.submit();
+                }, 1500);
+                
+            }, 1000);
+        }
+        
+        function createConfetti() {
+            const colors = ['#C4A484', '#B8956A', '#ffc107', '#28a745', '#17a2b8'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.style.left = Math.random() * window.innerWidth + 'px';
+                    confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDelay = Math.random() * 2 + 's';
+                    document.body.appendChild(confetti);
+                    
+                    const animation = confetti.animate([
+                        { transform: 'translateY(-100vh) rotate(0deg)', opacity: 1 },
+                        { transform: `translateY(100vh) rotate(720deg)`, opacity: 0 }
+                    ], {
+                        duration: 3000,
+                        easing: 'linear'
+                    });
+                    
+                    animation.onfinish = () => confetti.remove();
+                }, i * 50);
+            }
+        }
+        
+        function showSuccessPopup() {
+            const popup = document.getElementById('successPopup');
+            popup.classList.add('show');
+            
+            setTimeout(() => {
+                popup.classList.remove('show');
+            }, 3000);
+        }
+
         // Auto-hide success messages
         setTimeout(function() {
             const successMessage = document.querySelector('.message.success');
             if (successMessage) {
                 successMessage.style.opacity = '0';
-                setTimeout(function() {
-                    successMessage.style.display = 'none';
-                }, 300);
+                setTimeout(() => successMessage.remove(), 300);
             }
         }, 5000);
-
-        // Add some interactivity to achievement cards
-        document.querySelectorAll('.badge-card').forEach(card => {
-            card.addEventListener('click', function() {
-                if (!this.style.opacity || this.style.opacity === '1') {
-                    // Only animate if not completed
-                    this.style.transform = 'scale(1.05)';
-                    setTimeout(() => {
-                        this.style.transform = 'scale(1)';
-                    }, 200);
-                }
-            });
-        });
 
         // Animate progress bars on load
         window.addEventListener('load', function() {
@@ -1102,92 +939,18 @@ $message = getMessage();
             });
         });
 
-        // Add celebration effect for daily reward
-        const claimBtn = document.querySelector('.claim-btn');
-        if (claimBtn && !claimBtn.disabled) {
-            claimBtn.addEventListener('click', function() {
-                // Add some visual feedback
-                this.innerHTML = '🎉 Claiming...';
-                this.disabled = true;
-            });
-        }
-
-        // Tooltip functionality for achievement cards
-        document.querySelectorAll('.badge-card').forEach(card => {
-            card.setAttribute('title', 'Click to view details');
-        });
-
-        // Add some responsive behavior
-        function handleResize() {
-            const statsSection = document.querySelector('.stats-section');
-            if (window.innerWidth <= 768) {
-                // Mobile adjustments already handled in CSS
-            }
-        }
-
-        window.addEventListener('resize', handleResize);
-        handleResize(); // Call on load
-
-        // Add keyboard navigation for accessibility
-        document.addEventListener('keydown', function(event) {
-            if (event.key === 'Enter' || event.key === ' ') {
-                if (event.target.classList.contains('badge-card')) {
-                    event.target.click();
+        // Animate stat cards on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animation = 'slideDown 0.6s ease forwards';
                 }
-            }
+            });
         });
 
-        // Show encouraging messages based on progress
-        const totalPoints = <?php echo $total_points; ?>;
-        const completedTasks = <?php echo $completed_tasks; ?>;
-        
-        if (totalPoints === 0 && completedTasks === 0) {
-            // First time user
-            setTimeout(() => {
-                console.log('Welcome to EduHive! Start by creating your first task to earn points!');
-            }, 2000);
-        }
-
-        // Add visual feedback for new achievements
-        function celebrateAchievement() {
-            // Create confetti effect (simple version)
-            const colors = ['#C4A484', '#B8956A', '#ffc107', '#28a745'];
-            for (let i = 0; i < 50; i++) {
-                createConfetti(colors[Math.floor(Math.random() * colors.length)]);
-            }
-        }
-
-        function createConfetti(color) {
-            const confetti = document.createElement('div');
-            confetti.style.position = 'fixed';
-            confetti.style.width = '10px';
-            confetti.style.height = '10px';
-            confetti.style.backgroundColor = color;
-            confetti.style.left = Math.random() * window.innerWidth + 'px';
-            confetti.style.top = '-10px';
-            confetti.style.opacity = '0.8';
-            confetti.style.borderRadius = '50%';
-            confetti.style.pointerEvents = 'none';
-            confetti.style.zIndex = '9999';
-            
-            document.body.appendChild(confetti);
-            
-            const animation = confetti.animate([
-                { transform: 'translateY(0px) rotate(0deg)', opacity: 0.8 },
-                { transform: `translateY(${window.innerHeight + 100}px) rotate(360deg)`, opacity: 0 }
-            ], {
-                duration: 3000,
-                easing: 'linear'
-            });
-            
-            animation.onfinish = () => confetti.remove();
-        }
-
-        // Check if user just earned an achievement (simple check)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('achievement') === 'new') {
-            setTimeout(celebrateAchievement, 1000);
-        }
+        document.querySelectorAll('.stat-card').forEach(card => {
+            observer.observe(card);
+        });
     </script>
 </body>
 </html>
