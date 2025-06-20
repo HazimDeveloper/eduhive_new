@@ -52,3 +52,7 @@ CREATE TABLE rewards (
     points INT DEFAULT 0,
     earned_date DATE DEFAULT (CURRENT_DATE)
 );
+
+-- Tambah indeks untuk prestasi
+ALTER TABLE tasks
+ADD INDEX idx_user_status (user_id, status);

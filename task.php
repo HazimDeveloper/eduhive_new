@@ -11,18 +11,20 @@ $database = new Database();
 $db = $database->getConnection();
 
 
+// Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    switch ($_POST['action']) {
-        case 'test_notifications':
+    if (isset($_POST['action'])) {
+        switch ($_POST['action']) {
+            
+            case 'add_task_with_notifications':
             $title = cleanInput($_POST['title'] ?? '');
             $description = cleanInput($_POST['description'] ?? '');
             $priority = cleanInput($_POST['priority'] ?? 'medium');
             $due_date = cleanInput($_POST['due_date'] ?? '');
-            $assign_to = (int)($_POST['assign_to'] ?? 0);
+            $assign_to = cleanInput($_POST['assign_to'] ?? '');
             
             // Notification preferences
             $notify_email = isset($_POST['notify_email']);
-            $notify_telegram = isset($_POST['notify_telegram']);
             
             if (empty($title)) {
                 setMessage('Task title is required.', 'error');
@@ -32,17 +34,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $assigned_user_id = $assign_to ?: $user['id'];
                     
                     $stmt = $db->prepare("
-                        INSERT INTO tasks (user_id, title, description, priority, due_date, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, 'pending', NOW())
+                        INSERT INTO tasks (user_id, title, description, priority, status, due_date, created_at) 
+                        VALUES (?, ?, ?, ?, 'pending', ?, NOW())
                     ");
                     $stmt->execute([$assigned_user_id, $title, $description, $priority, $due_date ?: null]);
                     $task_id = $db->lastInsertId();
                     
                     // Send assignment notification if assigning to someone else
-                    if ($assign_to && $assign_to != $user['id']) {
+                    if ($assign_to == $user['id']) {
                         $channels = ['website'];
                         if ($notify_email) $channels[] = 'email';
-                        if ($notify_telegram) $channels[] = 'telegram';
                         
                         $assignment_title = "📋 New Task Assigned";
                         $assignment_message = "You have been assigned: '$title'";
@@ -54,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         sendMultiNotification($assign_to, $assignment_title, $assignment_message, 'task_assignment', $channels);
                     }
                     
-                    setMessage('Task created and notifications sent!', 'success');
+                    // setMessage('Task created and notifications sent!', 'success');
                 } catch (Exception $e) {
                     setMessage('Error creating task.', 'error');
                 }
@@ -65,83 +66,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $reminder_count = checkTasksAndSendReminders();
             setMessage("Checked tasks. Sent $reminder_count reminders.", 'info');
             break;
-    }
-    
-    header("Location: task.php");
-    exit();
-}
 
-// Handle form submissions
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
-        switch ($_POST['action']) {
-            case 'test_notifications':
-            $title = cleanInput($_POST['title'] ?? '');
-            $description = cleanInput($_POST['description'] ?? '');
-            $priority = cleanInput($_POST['priority'] ?? 'medium');
-            $due_date = cleanInput($_POST['due_date'] ?? '');
-            $assign_to = (int)($_POST['assign_to'] ?? 0);
-            
-            // Notification preferences
-            $notify_email = isset($_POST['notify_email']);
-            $notify_telegram = isset($_POST['notify_telegram']);
-            
-            if (empty($title)) {
-                setMessage('Task title is required.', 'error');
-            } else {
-                try {
-                    // Create task
-                    $assigned_user_id = $assign_to ?: $user['id'];
-                    
-                    $stmt = $db->prepare("
-                        INSERT INTO tasks (user_id, title, description, priority, due_date, status, created_at) 
-                        VALUES (?, ?, ?, ?, ?, 'pending', NOW())
-                    ");
-                    $stmt->execute([$assigned_user_id, $title, $description, $priority, $due_date ?: null]);
-                    $task_id = $db->lastInsertId();
-                    
-                    // Send assignment notification if assigning to someone else
-                    if ($assign_to && $assign_to != $user['id']) {
-                        $channels = ['website'];
-                        if ($notify_email) $channels[] = 'email';
-                        if ($notify_telegram) $channels[] = 'telegram';
-                        
-                        $assignment_title = "📋 New Task Assigned";
-                        $assignment_message = "You have been assigned: '$title'";
-                        $assignment_message .= "\nAssigned by: {$user['name']}";
-                        if ($due_date) {
-                            $assignment_message .= "\nDue: " . date('M d, Y', strtotime($due_date));
-                        }
-                        
-                        sendMultiNotification($assign_to, $assignment_title, $assignment_message, 'task_assignment', $channels);
-                    }
-                    
-                    setMessage('Task created and notifications sent!', 'success');
-                } catch (Exception $e) {
-                    setMessage('Error creating task.', 'error');
-                }
-            }
-            break;
-            
             case 'add_task':
+                $db->beginTransaction();
+
                 $title = cleanInput($_POST['title'] ?? '');
                 $description = cleanInput($_POST['description'] ?? '');
                 $priority = cleanInput($_POST['priority'] ?? 'medium');
                 $due_date = cleanInput($_POST['due_date'] ?? '');
-                $course = cleanInput($_POST['course'] ?? '');
+                // $course = cleanInput($_POST['course'] ?? '');
                 
                 if (empty($title)) {
                     setMessage('Task title is required.', 'error');
                 } else {
                     try {
                         $stmt = $db->prepare("
-                            INSERT INTO tasks (user_id, title, description, priority, due_date, course, status, created_at) 
-                            VALUES (?, ?, ?, ?, ?, ?, 'pending', NOW())
+                            INSERT INTO tasks (user_id, title, description, priority, status, due_date, created_at) 
+                            VALUES (?, ?, ?, ?, ?, 'pending', ?, NOW())
                         ");
-                        $stmt->execute([$user['id'], $title, $description, $priority, $due_date ?: null, $course]);
+                        error_log('Task added with ID: ' . $db->lastInsertId());
+                        $stmt->execute([$user['id'], $title, $description, $priority, $due_date ?: null]);
                         setMessage('Task added successfully!', 'success');
+                        $db->commit();
                     } catch (Exception $e) {
-                        setMessage('Error adding task. Please try again.', 'error');
+                        $db->rollBack();
+                        error_log('Database error: ' . $e->getMessage());  // Log ralat
+                        setMessage('Error: ' . $e->getMessage(), 'error'); // Papar mesej ralat sebenar
                     }
                 }
                 break;
@@ -236,7 +186,7 @@ try {
         WHERE $where_clause 
         ORDER BY 
             CASE WHEN status = 'completed' THEN 1 ELSE 0 END,
-            CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END,
+            CASE priority WHEN 'medium' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 END,
             due_date ASC,
             created_at DESC
     ");
@@ -927,7 +877,7 @@ $message = getMessage();
                     <div class="form-group">
                         <label class="form-label">Assign to User (Optional)</label>
                         <select name="assign_to" class="form-select">
-                            <option value="">Assign to myself</option>
+                            <option value="1">Assign to myself</option>
                             <?php
                             // Get all users for assignment
                             try {
@@ -961,20 +911,6 @@ $message = getMessage();
                             <label for="notify_email">📧 Email Notification</label>
                         </div>
                         
-                        <div class="notification-channel">
-                            <input type="checkbox" name="notify_telegram" id="notify_telegram">
-                            <label for="notify_telegram">📱 Telegram Notification</label>
-                        </div>
-
-                        <div class="telegram-setup" id="telegramSetup" style="display: none;">
-                            <strong>📱 Setup Telegram Notifications:</strong>
-                            <div class="telegram-steps">
-                                1. Search for bot: <code>@YourEduHiveBot</code><br>
-                                2. Send: <code>/start</code><br>
-                                3. Copy your Chat ID from bot response<br>
-                                4. Enter it in your profile settings
-                            </div>
-                        </div>
                     </div>
 
                     <div class="form-actions">
@@ -994,7 +930,7 @@ $message = getMessage();
                 <p>Test your notification settings:</p>
                 <div style="margin: 15px 0; display: flex; gap: 10px;">
                     <button onclick="testNotification('email')" class="btn primary">📧 Test Email</button>
-                    <button onclick="testNotification('telegram')" class="btn primary">📱 Test Telegram</button>
+                    <!-- <button onclick="testNotification('telegram')" class="btn primary">📱 Test Telegram</button> -->
                     <button onclick="testNotification('all')" class="btn primary">🔔 Test All</button>
                 </div>
                 
@@ -1195,7 +1131,7 @@ $message = getMessage();
             </form>
         </div>
     </div>
-
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script>
         function openModal(modalId) {
             document.getElementById(modalId).classList.add('active');
@@ -1237,9 +1173,6 @@ $message = getMessage();
             this.form.submit();
         });
 
-          document.getElementById('notify_telegram').addEventListener('change', function() {
-            document.getElementById('telegramSetup').style.display = this.checked ? 'block' : 'none';
-        });
 
         // Test notifications
         function testNotification(type) {
@@ -1248,7 +1181,7 @@ $message = getMessage();
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
                 },
-                body: 'action=test_notification&type=' + type
+                body: 'action=test_all&type=' + type
             })
             .then(response => response.json())
             .then(data => {

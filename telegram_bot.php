@@ -11,7 +11,21 @@ $update = json_decode($content, true);
 file_put_contents('telegram_log.txt', date('Y-m-d H:i:s') . " - " . $content . "\n", FILE_APPEND);
 
 if (isset($update['message'])) {
-    $chat_id = $update['message']['chat']['id'];
+    // Tambah kod untuk log chat ID
+    $update = json_decode(file_get_contents('php://input'), TRUE);
+    if(isset($update['message']['text']) && $update['message']['text'] === '/start') {
+        $chat_id = $update['message']['chat']['id'];
+        
+        // Simpan ke database
+        $stmt = $db->prepare("INSERT INTO user_telegram (user_id, chat_id) VALUES (?, ?)");
+        $stmt->execute([$user['id'], $chat_id]);
+        
+        sendMessage($chat_id, "✅ Chat ID anda telah disimpan: ".$chat_id);
+        file_put_contents('chat_ids.log', 
+            date('Y-m-d H:i:s')." - Chat ID: ".$chat_id.PHP_EOL, 
+            FILE_APPEND
+        );
+    }
     $message_text = $update['message']['text'] ?? '';
     $first_name = $update['message']['from']['first_name'] ?? 'User';
     $username = $update['message']['from']['username'] ?? '';
@@ -87,6 +101,36 @@ function sendTelegramMessage($chat_id, $text) {
         'text' => $text,
         'parse_mode' => 'Markdown',
         'disable_web_page_preview' => true
+    ];
+    
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    
+    $response = curl_exec($ch);
+    curl_close($ch);
+    
+    return $response;
+}
+?>
+
+// Pastikan token bot dan chat ID sah
+// Update token dan chat ID
+$telegram_bot_token = '8122156077:AAEL_j6QN-vnPrfyqbOnam4mCfBQfIjId9k'; // Token baru
+$telegram_chat_id = '8122156077'; // Ganti dengan chat ID sebenar
+
+// Fungsi untuk hantar notifikasi
+function sendTelegramNotification($message) {
+    global $telegram_bot_token, $telegram_chat_id;
+    
+    $url = "https://api.telegram.org/bot{$telegram_bot_token}/sendMessage";
+    $data = [
+        'chat_id' => $telegram_chat_id,
+        'text' => $message,
+        'parse_mode' => 'HTML'
     ];
     
     $ch = curl_init();

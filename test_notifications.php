@@ -1,11 +1,11 @@
 <?php
-// test_notifications.php - Complete fixed version for EduHive
-// Make sure to place this file in your project root directory
+// test_notifications.php - Fixed version for EduHive
+// Place this file in your project root directory
 
 // Prevent any output before JSON
 ob_start();
 
-// Error handling - disable display for production
+// Error handling
 error_reporting(E_ALL);
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
@@ -13,9 +13,6 @@ ini_set('log_errors', 1);
 // Set JSON headers
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, must-revalidate');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
 
 // Handle OPTIONS request for CORS
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -55,7 +52,7 @@ try {
         exit();
     }
 
-    // Get action
+    // Get action from POST data
     $action = $_POST['action'] ?? '';
 
     switch ($action) {
@@ -63,7 +60,7 @@ try {
             $title = "🧪 Test Email Notification";
             $message = "This is a test email from EduHive notification system.\n\nTime: " . date('Y-m-d H:i:s') . "\n\nIf you receive this email, your email notifications are working correctly!";
             
-            $result = testSendEmail($user['email'], $user['name'], $title, $message);
+            $result = sendTestEmail($user['email'], $user['name'], $title, $message);
             
             echo json_encode([
                 'success' => $result,
@@ -72,25 +69,21 @@ try {
             break;
 
         case 'test_telegram':
-            // Get chat ID from POST or database
-            $chat_id = $_POST['chat_id'] ?? '';
-            
-            if (empty($chat_id)) {
-                // Try to get from user database
-                try {
-                    $stmt = $db->prepare("SELECT telegram_chat_id FROM users WHERE id = ?");
-                    $stmt->execute([$user['id']]);
-                    $user_data = $stmt->fetch();
-                    $chat_id = $user_data['telegram_chat_id'] ?? '';
-                } catch (Exception $e) {
-                    // Ignore database error, will handle empty chat_id below
-                }
+            // Get chat ID from user database
+            $chat_id = '';
+            try {
+                $stmt = $db->prepare("SELECT telegram_chat_id FROM users WHERE id = ?");
+                $stmt->execute([$user['id']]);
+                $user_data = $stmt->fetch();
+                $chat_id = $user_data['telegram_chat_id'] ?? '';
+            } catch (Exception $e) {
+                // Ignore database error, will handle empty chat_id below
             }
             
             if (empty($chat_id)) {
                 echo json_encode([
                     'success' => false,
-                    'message' => 'No Telegram Chat ID found. Please message @eduhive_notifications_bot first and get your Chat ID.'
+                    'message' => 'No Telegram Chat ID found. Please setup Telegram in your profile first.'
                 ]);
                 break;
             }
@@ -98,11 +91,11 @@ try {
             $title = "🧪 Test Telegram Notification";
             $message = "Hello from EduHive!\n\nThis is a test notification to verify your Telegram setup.\n\nTime: " . date('Y-m-d H:i:s') . "\n\nIf you see this message, your Telegram notifications are working perfectly! 🎉";
             
-            $result = testSendTelegram($chat_id, $title, $message);
+            $result = sendTestTelegram($chat_id, $title, $message);
             
             echo json_encode([
                 'success' => $result,
-                'message' => $result ? 'Test message sent to Telegram! Check your chat.' : 'Failed to send Telegram message. Check your Chat ID or bot configuration.'
+                'message' => $result ? 'Test message sent to Telegram! Check your chat.' : 'Failed to send Telegram message. Check your Chat ID.'
             ]);
             break;
 
@@ -110,7 +103,7 @@ try {
             $title = "🧪 Website Test Notification";
             $message = "This is a test website notification created at " . date('Y-m-d H:i:s') . ". If you see this in your notifications page, website notifications are working!";
             
-            $result = testCreateWebsiteNotification($user['id'], $title, $message, $db);
+            $result = createTestWebsiteNotification($user['id'], $title, $message, $db);
             
             echo json_encode([
                 'success' => $result,
@@ -118,44 +111,34 @@ try {
             ]);
             break;
 
-        case 'test_notifications':
+        case 'test_all':
             $title = "🧪 Multi-Channel Test";
             $message = "Testing all notification channels from EduHive system.\n\nTime: " . date('Y-m-d H:i:s') . "\n\nThis tests website, email, and Telegram notifications.";
             
-            $results = testAllNotifications($user['id'], $user['email'], $user['name'], $title, $message, $db);
+            $results = testAllNotificationChannels($user['id'], $user['email'], $user['name'], $title, $message, $db);
             
             $success_channels = array_keys(array_filter($results));
             $failed_channels = array_keys(array_filter($results, function($v) { return !$v; }));
             
             $success = !empty($success_channels);
-            $message = $success 
+            $response_message = $success 
                 ? 'Success: ' . implode(', ', $success_channels) . (empty($failed_channels) ? '' : '. Failed: ' . implode(', ', $failed_channels))
                 : 'All channels failed: ' . implode(', ', $failed_channels);
             
             echo json_encode([
                 'success' => $success,
-                'message' => $message,
+                'message' => $response_message,
                 'details' => $results
             ]);
             break;
 
         case 'check_due_tasks':
-            $reminder_count = checkAndSendTaskReminders($user['id'], $db);
+            $reminder_count = checkAndCreateTaskReminders($user['id'], $database);
             
             echo json_encode([
                 'success' => true,
                 'message' => "Checked due tasks. Sent $reminder_count reminders.",
                 'reminders_sent' => $reminder_count
-            ]);
-            break;
-
-        case 'get_telegram_info':
-            $bot_info = getTelegramBotInfo();
-            
-            echo json_encode([
-                'success' => $bot_info['success'],
-                'message' => $bot_info['success'] ? 'Bot is working' : 'Bot connection failed',
-                'bot_info' => $bot_info
             ]);
             break;
 
@@ -175,8 +158,7 @@ try {
     ob_clean();
     echo json_encode([
         'success' => false,
-        'message' => 'System error occurred. Please try again.',
-        'error' => $e->getMessage() // Remove this in production
+        'message' => 'System error occurred. Please try again.'
     ]);
 }
 
@@ -186,7 +168,7 @@ exit();
 // HELPER FUNCTIONS
 // =============================================================================
 
-function testSendEmail($email, $name, $title, $message) {
+function sendTestEmail($email, $name, $title, $message) {
     try {
         $subject = "EduHive: " . $title;
         
@@ -245,9 +227,9 @@ function testSendEmail($email, $name, $title, $message) {
     }
 }
 
-function testSendTelegram($chat_id, $title, $message) {
+function sendTestTelegram($chat_id, $title, $message) {
     try {
-        // Your bot token
+        // Bot token
         $bot_token = "8122156077:AAEL_j6QN-vnPrfyqbOnam4mCfBQfIjId9k";
         $url = "https://api.telegram.org/bot$bot_token/sendMessage";
         
@@ -273,7 +255,7 @@ function testSendTelegram($chat_id, $title, $message) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // For localhost testing
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_USERAGENT, 'EduHive Bot 1.0');
         
         $response = curl_exec($ch);
@@ -289,7 +271,6 @@ function testSendTelegram($chat_id, $title, $message) {
         $result = json_decode($response, true);
         
         if ($http_code === 200 && isset($result['ok']) && $result['ok']) {
-            error_log("Telegram message sent successfully to chat_id: $chat_id");
             return true;
         } else {
             error_log("Telegram API Error (HTTP $http_code): " . $response);
@@ -302,7 +283,7 @@ function testSendTelegram($chat_id, $title, $message) {
     }
 }
 
-function testCreateWebsiteNotification($user_id, $title, $message, $db) {
+function createTestWebsiteNotification($user_id, $title, $message, $db) {
     try {
         $stmt = $db->prepare("
             INSERT INTO notifications (user_id, title, message, type, created_at) 
@@ -316,14 +297,14 @@ function testCreateWebsiteNotification($user_id, $title, $message, $db) {
     }
 }
 
-function testAllNotifications($user_id, $email, $name, $title, $message, $db) {
+function testAllNotificationChannels($user_id, $email, $name, $title, $message, $db) {
     $results = array();
     
     // Test website notification
-    $results['website'] = testCreateWebsiteNotification($user_id, $title, $message, $db);
+    $results['website'] = createTestWebsiteNotification($user_id, $title, $message, $db);
     
     // Test email notification
-    $results['email'] = testSendEmail($email, $name, $title, $message);
+    $results['email'] = sendTestEmail($email, $name, $title, $message);
     
     // Test telegram notification (get chat_id from database)
     try {
@@ -333,7 +314,7 @@ function testAllNotifications($user_id, $email, $name, $title, $message, $db) {
         $chat_id = $user_data['telegram_chat_id'] ?? '';
         
         if (!empty($chat_id)) {
-            $results['telegram'] = testSendTelegram($chat_id, $title, $message);
+            $results['telegram'] = sendTestTelegram($chat_id, $title, $message);
         } else {
             $results['telegram'] = false;
         }
@@ -342,86 +323,5 @@ function testAllNotifications($user_id, $email, $name, $title, $message, $db) {
     }
     
     return $results;
-}
-
-function checkAndSendTaskReminders($user_id, $db) {
-    try {
-        // Get tasks due tomorrow that haven't been reminded today
-        $tomorrow = date('Y-m-d', strtotime('+1 day'));
-        
-        $stmt = $db->prepare("
-            SELECT id, title, due_date 
-            FROM tasks 
-            WHERE user_id = ? 
-            AND due_date = ? 
-            AND status != 'completed'
-            AND id NOT IN (
-                SELECT DISTINCT task_id FROM notifications 
-                WHERE user_id = ? 
-                AND type = 'task_due_reminder' 
-                AND DATE(created_at) = CURDATE()
-                AND task_id IS NOT NULL
-            )
-        ");
-        $stmt->execute([$user_id, $tomorrow, $user_id]);
-        $due_tasks = $stmt->fetchAll();
-        
-        $sent_count = 0;
-        foreach ($due_tasks as $task) {
-            $title = "⏰ Task Due Tomorrow";
-            $message = "Your task '{$task['title']}' is due tomorrow (" . date('M d, Y', strtotime($task['due_date'])) . ").\n\nPlease complete it on time!";
-            
-            // Create website notification
-            $stmt = $db->prepare("
-                INSERT INTO notifications (user_id, title, message, type, task_id, created_at) 
-                VALUES (?, ?, ?, 'task_due_reminder', ?, NOW())
-            ");
-            $stmt->execute([$user_id, $title, $message, $task['id']]);
-            $sent_count++;
-        }
-        
-        return $sent_count;
-        
-    } catch (Exception $e) {
-        error_log("Task reminder check error: " . $e->getMessage());
-        return 0;
-    }
-}
-
-function getTelegramBotInfo() {
-    try {
-        $bot_token = "8122156077:AAEL_j6QN-vnPrfyqbOnam4mCfBQfIjId9k";
-        $url = "https://api.telegram.org/bot$bot_token/getMe";
-        
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curl_error = curl_error($ch);
-        curl_close($ch);
-        
-        if ($curl_error) {
-            return array('success' => false, 'error' => $curl_error);
-        }
-        
-        $result = json_decode($response, true);
-        
-        if ($http_code === 200 && isset($result['ok']) && $result['ok']) {
-            return array(
-                'success' => true,
-                'bot_name' => $result['result']['first_name'],
-                'bot_username' => $result['result']['username']
-            );
-        } else {
-            return array('success' => false, 'error' => $response);
-        }
-        
-    } catch (Exception $e) {
-        return array('success' => false, 'error' => $e->getMessage());
-    }
 }
 ?>
