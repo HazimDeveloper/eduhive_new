@@ -284,10 +284,10 @@ function sendEmail($to, $subject, $message, $from = 'noreply@eduhive.com')
         $mail->isSMTP();
         $mail->Host = 'smtp.gmail.com';
         $mail->SMTPAuth = true;
-        $mail->Username = 'masyraaf886@gmail.com'; //your email address (change this part)
-        $mail->Password = 'aosf bkyv cmnh guhz'; // your generated app password (change this part)
-        $mail->SMTPSecure = 'tls';
-        $mail->Port = 587;
+        $mail->Username = 'hazim4128@gmail.com'; //your email address (change this part)
+        $mail->Password = 'leyc xnku dwoo aznb'; // your generated app password (change this part)
+        $mail->SMTPSecure = 'tsl';
+        $mail->Port = 587; // Use 465 for SSL, 587 for TLS
 
         // Recipients
         $mail->setFrom($from, 'EduHive');

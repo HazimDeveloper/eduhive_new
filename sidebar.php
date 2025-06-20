@@ -32,11 +32,6 @@ $menu_items = [
         'label' => 'Record Time',
         'icon' => '⏱️'
     ],
-    'file_manager' => [           // NEW
-        'file' => 'file_manager.php',
-        'label' => 'Files',
-        'icon' => '📁'
-    ],
     'notifications' => [          // NEW
         'file' => 'notifications.php',
         'label' => 'Notifications',
